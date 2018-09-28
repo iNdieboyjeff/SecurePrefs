@@ -9,6 +9,8 @@ buildscript {
     }
 
     dependencies {
+        classpath "org.jfrog.buildinfo:build-info-extractor-gradle:latest.release"
+        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.7.3'
         classpath 'com.android.tools.build:gradle:3.2.0'
         classpath 'net.ltgt.gradle:gradle-errorprone-plugin:0.0.13'
     }
@@ -23,6 +25,7 @@ plugins {
 
 apply plugin: 'com.android.library'
 apply plugin: 'net.ltgt.errorprone'
+apply plugin: 'maven-publish'
 apply plugin: 'com.jfrog.bintray'
 
 allprojects {
@@ -54,9 +57,35 @@ android {
 def siteUrl = 'https://github.com/iNdieboyjeff/SecurePrefs'   // Homepage URL of the library
 def gitUrl = 'https://github.com/iNdieboyjeff/SecurePrefs.git'   // Git repository URL
 def issueUrl = 'https://github.com/iNdieboyjeff/SecurePrefs/issues'
+def licenseName = 'The Apache Software License, Version 2.0'
+def licenseUrl = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+def allLicenses = ["Apache-2.0"]
 
+publishing {
+    publications {
+        Production(MavenPublication) {
+            artifact("$buildDir/outputs/aar/secureprefs-release.aar")
+            groupId 'util.android'
+            artifactId 'secureprefs'
+            version version
 
+            pom.withXml {
+                def dependenciesNode = asNode().appendNode('dependencies')
 
+                // Iterate over the implementation dependencies (we don't want the test ones), adding a <dependency> node for each
+                configurations.implementation.allDependencies.each {
+                    // Ensure dependencies such as fileTree are not included in the pom.
+                    if (it.name != 'unspecified') {
+                        def dependencyNode = dependenciesNode.appendNode('dependency')
+                        dependencyNode.appendNode('groupId', it.group)
+                        dependencyNode.appendNode('artifactId', it.name)
+                        dependencyNode.appendNode('version', it.version)
+                    }
+                }
+            }
+        }
+    }
+}
 
 task sourcesJar(type: Jar) {
     from android.sourceSets.main.java.srcDirs
@@ -92,7 +121,10 @@ properties.load(project.rootProject.file('local.properties').newDataInputStream(
 bintray {
     user = properties.getProperty("bintray.user")
     key = properties.getProperty("bintray.apikey")
-
+    dryRun = false //[Default: false] Whether to run this as dry-run, without deploying
+    publish = true //[Default: false] Whether version should be auto published after an upload
+    override = true //[Default: false] Whether to override version artifacts already published
+    publications = ['Production']
     configurations = ['archives']
     pkg {
         repo = "maven"
